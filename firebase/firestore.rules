@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isStoreManager() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'store_manager'];
+    }
+    
+    function isSalesman() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'store_manager', 'salesman'];
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isStoreManager());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+    
+    // Products collection
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if isStoreManager();
+      allow update: if isStoreManager();
+      allow delete: if isAdmin();
+    }
+    
+    // Sales collection
+    match /sales/{saleId} {
+      allow read: if isAuthenticated();
+      allow create: if isSalesman();
+      allow update: if isSalesman() && resource.data.status == 'pending';
+      allow delete: if isAdmin();
+    }
+    
+    // Customers collection
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow write: if isSalesman();
+    }
+    
+    // Suppliers collection
+    match /suppliers/{supplierId} {
+      allow read: if isAuthenticated();
+      allow write: if isStoreManager();
+    }
+    
+    // Categories collection
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isStoreManager();
+    }
+    
+    // Brands collection
+    match /brands/{brandId} {
+      allow read: if isAuthenticated();
+      allow write: if isStoreManager();
+    }
+    
+    // Payments collection
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isSalesman();
+      allow update: if isSalesman();
+    }
+    
+    // Pending Payments collection
+    match /pendingPayments/{pendingId} {
+      allow read: if isAuthenticated();
+      allow create: if isSalesman();
+      allow update: if isSalesman();
+    }
+    
+    // Activity Logs
+    match /activityLogs/{logId} {
+      allow read: if isStoreManager();
+      allow create: if isAuthenticated();
+    }
+    
+    // Settings
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
